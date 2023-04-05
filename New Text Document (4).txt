@@ -1,0 +1,544 @@
+#define F_CPU 8000000L // run CPU at 16 MHz
+#define LED 5 // Boarduino LED on PB5
+#define ClearBit(x,y) x &= ~_BV(y) // equivalent to cbi(x,y)
+#define SetBit(x,y) x |= _BV(y) // equivalent to sbi(x,y)
+// ---------------------------------------------------------------------------
+// INCLUDES
+#include <avr/io.h> // deal with port registers
+#include <avr/interrupt.h> // deal with interrupt calls
+#include <avr/pgmspace.h> // put character data into progmem
+#include <util/delay.h> // used for _delay_ms function
+#include <string.h> // string manipulation routines
+#include <avr/sleep.h> // used for sleep functions
+#include <stdlib.h>
+// ---------------------------------------------------------------------------
+// TYPEDEFS
+typedef uint8_t byte; // I just like byte & sbyte better
+typedef int8_t sbyte;
+// ---------------------------------------------------------------------------
+// GLOBAL VARIABLES
+const byte FONT_CHARS[96][5] PROGMEM =
+{
+	{ 0x00, 0x00, 0x00, 0x00, 0x00 }, // (space)
+	{ 0x00, 0x00, 0x5F, 0x00, 0x00 }, // !
+	{ 0x00, 0x07, 0x00, 0x07, 0x00 }, // "
+	{ 0x14, 0x7F, 0x14, 0x7F, 0x14 }, // #
+	{ 0x24, 0x2A, 0x7F, 0x2A, 0x12 }, // $
+	{ 0x23, 0x13, 0x08, 0x64, 0x62 }, // %
+	{ 0x36, 0x49, 0x55, 0x22, 0x50 }, // &
+	{ 0x00, 0x05, 0x03, 0x00, 0x00 }, // '
+	{ 0x00, 0x1C, 0x22, 0x41, 0x00 }, // (
+	{ 0x00, 0x41, 0x22, 0x1C, 0x00 }, // )
+	{ 0x08, 0x2A, 0x1C, 0x2A, 0x08 }, // *
+	{ 0x08, 0x08, 0x3E, 0x08, 0x08 }, // +
+	{ 0x00, 0x50, 0x30, 0x00, 0x00 }, // ,
+	{ 0x08, 0x08, 0x08, 0x08, 0x08 }, // -
+	{ 0x00, 0x60, 0x60, 0x00, 0x00 }, // .
+	{ 0x20, 0x10, 0x08, 0x04, 0x02 }, // /
+	{ 0x3E, 0x51, 0x49, 0x45, 0x3E }, // 0
+	{ 0x00, 0x42, 0x7F, 0x40, 0x00 }, // 1
+	{ 0x42, 0x61, 0x51, 0x49, 0x46 }, // 2
+	{ 0x21, 0x41, 0x45, 0x4B, 0x31 }, // 3
+	{ 0x18, 0x14, 0x12, 0x7F, 0x10 }, // 4
+	{ 0x27, 0x45, 0x45, 0x45, 0x39 }, // 5
+	{ 0x3C, 0x4A, 0x49, 0x49, 0x30 }, // 6
+	{ 0x01, 0x71, 0x09, 0x05, 0x03 }, // 7
+	{ 0x36, 0x49, 0x49, 0x49, 0x36 }, // 8
+	{ 0x06, 0x49, 0x49, 0x29, 0x1E }, // 9
+	{ 0x00, 0x36, 0x36, 0x00, 0x00 }, // :
+	{ 0x00, 0x56, 0x36, 0x00, 0x00 }, // ;
+	{ 0x00, 0x08, 0x14, 0x22, 0x41 }, // <
+	{ 0x14, 0x14, 0x14, 0x14, 0x14 }, // =
+	{ 0x41, 0x22, 0x14, 0x08, 0x00 }, // >
+	{ 0x02, 0x01, 0x51, 0x09, 0x06 }, // ?
+	{ 0x32, 0x49, 0x79, 0x41, 0x3E }, // @
+	{ 0x7E, 0x11, 0x11, 0x11, 0x7E }, // A
+	{ 0x7F, 0x49, 0x49, 0x49, 0x36 }, // B
+	{ 0x3E, 0x41, 0x41, 0x41, 0x22 }, // C
+	{ 0x7F, 0x41, 0x41, 0x22, 0x1C }, // D
+	{ 0x7F, 0x49, 0x49, 0x49, 0x41 }, // E
+	{ 0x7F, 0x09, 0x09, 0x01, 0x01 }, // F
+	{ 0x3E, 0x41, 0x41, 0x51, 0x32 }, // G
+	{ 0x7F, 0x08, 0x08, 0x08, 0x7F }, // H
+	{ 0x00, 0x41, 0x7F, 0x41, 0x00 }, // I
+	{ 0x20, 0x40, 0x41, 0x3F, 0x01 }, // J
+	{ 0x7F, 0x08, 0x14, 0x22, 0x41 }, // K
+	{ 0x7F, 0x40, 0x40, 0x40, 0x40 }, // L
+	{ 0x7F, 0x02, 0x04, 0x02, 0x7F }, // M
+	{ 0x7F, 0x04, 0x08, 0x10, 0x7F }, // N
+	{ 0x3E, 0x41, 0x41, 0x41, 0x3E }, // O
+	{ 0x7F, 0x09, 0x09, 0x09, 0x06 }, // P
+	{ 0x3E, 0x41, 0x51, 0x21, 0x5E }, // Q
+	{ 0x7F, 0x09, 0x19, 0x29, 0x46 }, // R
+	{ 0x46, 0x49, 0x49, 0x49, 0x31 }, // S
+	{ 0x01, 0x01, 0x7F, 0x01, 0x01 }, // T
+	{ 0x3F, 0x40, 0x40, 0x40, 0x3F }, // U
+	{ 0x1F, 0x20, 0x40, 0x20, 0x1F }, // V
+	{ 0x7F, 0x20, 0x18, 0x20, 0x7F }, // W
+	{ 0x63, 0x14, 0x08, 0x14, 0x63 }, // X
+	{ 0x03, 0x04, 0x78, 0x04, 0x03 }, // Y
+	{ 0x61, 0x51, 0x49, 0x45, 0x43 }, // Z
+	{ 0x00, 0x00, 0x7F, 0x41, 0x41 }, // [
+	{ 0x02, 0x04, 0x08, 0x10, 0x20 }, // "\"
+	{ 0x41, 0x41, 0x7F, 0x00, 0x00 }, // ]
+	{ 0x04, 0x02, 0x01, 0x02, 0x04 }, // ^
+	{ 0x40, 0x40, 0x40, 0x40, 0x40 }, // _
+	{ 0x00, 0x01, 0x02, 0x04, 0x00 }, // `
+	{ 0x20, 0x54, 0x54, 0x54, 0x78 }, // a
+	{ 0x7F, 0x48, 0x44, 0x44, 0x38 }, // b
+	{ 0x38, 0x44, 0x44, 0x44, 0x20 }, // c
+	{ 0x38, 0x44, 0x44, 0x48, 0x7F }, // d
+	{ 0x38, 0x54, 0x54, 0x54, 0x18 }, // e
+	{ 0x08, 0x7E, 0x09, 0x01, 0x02 }, // f
+	{ 0x08, 0x14, 0x54, 0x54, 0x3C }, // g
+	{ 0x7F, 0x08, 0x04, 0x04, 0x78 }, // h
+	{ 0x00, 0x44, 0x7D, 0x40, 0x00 }, // i
+	{ 0x20, 0x40, 0x44, 0x3D, 0x00 }, // j
+	{ 0x00, 0x7F, 0x10, 0x28, 0x44 }, // k
+	{ 0x00, 0x41, 0x7F, 0x40, 0x00 }, // l
+	{ 0x7C, 0x04, 0x18, 0x04, 0x78 }, // m
+	{ 0x7C, 0x08, 0x04, 0x04, 0x78 }, // n
+	{ 0x38, 0x44, 0x44, 0x44, 0x38 }, // o
+	{ 0x7C, 0x14, 0x14, 0x14, 0x08 }, // p
+	{ 0x08, 0x14, 0x14, 0x18, 0x7C }, // q
+	{ 0x7C, 0x08, 0x04, 0x04, 0x08 }, // r
+	{ 0x48, 0x54, 0x54, 0x54, 0x20 }, // s
+	{ 0x04, 0x3F, 0x44, 0x40, 0x20 }, // t
+	{ 0x3C, 0x40, 0x40, 0x20, 0x7C }, // u
+	{ 0x1C, 0x20, 0x40, 0x20, 0x1C }, // v
+	{ 0x3C, 0x40, 0x30, 0x40, 0x3C }, // w
+	{ 0x44, 0x28, 0x10, 0x28, 0x44 }, // x
+	{ 0x0C, 0x50, 0x50, 0x50, 0x3C }, // y
+	{ 0x44, 0x64, 0x54, 0x4C, 0x44 }, // z
+	{ 0x00, 0x08, 0x36, 0x41, 0x00 }, // {
+	{ 0x00, 0x00, 0x7F, 0x00, 0x00 }, // |
+	{ 0x00, 0x41, 0x36, 0x08, 0x00 }, // }
+	{ 0x08, 0x08, 0x2A, 0x1C, 0x08 }, // ->
+	{ 0x08, 0x1C, 0x2A, 0x08, 0x08 }, // <-
+};
+// ---------------------------------------------------------------------------
+// MISC ROUTINES
+void SetupPorts()
+{
+	DDRB = 0b00101110; // 0010.1111; set B0-B3, B5 as outputs
+	DDRC = 0x00; // 0000.0000; set PORTC as inputs
+	//SetBit(PORTB,0); // start with TFT reset line inactive high
+}
+void msDelay(int delay) // put into a routine
+{ // to remove code inlining
+	for (int i=0;i<delay;i++) // at cost of timing accuracy
+	_delay_ms(1);
+}
+void FlashLED(byte count)
+// flash the on-board LED at ~ 3 Hz
+{
+	for (;count>0;count--)
+	{
+		SetBit(PORTB,LED); // turn LED on
+		msDelay(150); // wait
+		ClearBit(PORTB,LED); // turn LED off
+		msDelay(150); // wait
+	}
+}
+
+void OpenSPI()
+{
+	SPCR = 0x50; // SPI enabled as Master, Mode0 at 4 MHz
+	SetBit(SPSR,SPI2X); // double the SPI rate: 4-->8 MHz
+}
+void CloseSPI()
+{
+	SPCR = 0x00; // clear SPI enable bit
+}
+byte Xfer(byte data)
+{
+	SPDR = data; // initiate transfer
+	while (!(SPSR & 0x80)); // wait for transfer to complete
+	return SPDR;
+}
+// ---------------------------------------------------------------------------
+// ST7735 ROUTINES
+#define SWRESET 0x01 // software reset
+#define SLPOUT 0x11 // sleep out
+#define DISPOFF 0x28 // display off
+#define DISPON 0x29 // display on
+#define CASET 0x2A // column address set
+#define RASET 0x2B // row address set
+#define RAMWR 0x2C // RAM write
+
+#define MADCTL 0x36 // axis control
+#define COLMOD 0x3A // color mode
+// 1.8" TFT display constants
+#define XSIZE 128
+#define YSIZE 160
+#define XMAX XSIZE-1
+#define YMAX YSIZE-1
+// Color constants
+#define BLACK 0x0000
+#define BLUE 0x001F
+#define RED 0xF800
+#define GREEN 0x0400
+#define LIME 0x07E0
+#define CYAN 0x07FF
+#define MAGENTA 0xF81F
+#define YELLOW 0xFFE0
+#define WHITE 0xFFFF
+void WriteCmd (byte cmd)
+{
+	ClearBit(PORTB,1); // B1=DC; 0=command, 1=data
+	Xfer(cmd);
+	SetBit(PORTB,1); // return DC high
+}
+void WriteByte (byte b)
+{
+	Xfer(b);
+}
+void WriteWord (int w)
+{
+	Xfer(w >> 8); // write upper 8 bits
+	Xfer(w & 0xFF); // write lower 8 bits
+}
+void Write888 (long data, int count)
+{
+	byte red = data>>16; // red = upper 8 bits
+	byte green = (data>>8) & 0xFF; // green = middle 8 bits
+	byte blue = data & 0xFF; // blue = lower 8 bits
+	for (;count>0;count--)
+	{
+		WriteByte(red);
+		WriteByte(green);
+		WriteByte(blue);
+	}
+}
+void Write565 (int data, unsigned int count)
+// send 16-bit pixel data to the controller
+// note: inlined spi xfer for optimization
+{
+	WriteCmd(RAMWR);
+	for (;count>0;count--)
+	{
+		SPDR = (data >> 8); // write hi byte
+		while (!(SPSR & 0x80)); // wait for transfer to complete
+		SPDR = (data & 0xFF); // write lo byte
+		while (!(SPSR & 0x80)); // wait for transfer to complete
+	}
+}
+void HardwareReset()
+{
+	//ClearBit(PORTB,0); // pull PB0 (digital 8) low
+	msDelay(1); // 1mS is enough
+
+	//SetBit(PORTB,0); // return PB0 high
+	msDelay(150); // wait 150mS for reset to finish
+}
+void InitDisplay()
+{
+	HardwareReset(); // initialize display controller
+	WriteCmd(SLPOUT); // take display out of sleep mode
+	msDelay(150); // wait 150mS for TFT driver circuits
+	WriteCmd(COLMOD); // select color mode:
+	WriteByte(0x05); // mode 5 = 16bit pixels (RGB565)
+	WriteCmd(DISPON); // turn display on!
+}
+void SetAddrWindow(byte x0, byte y0, byte x1, byte y1)
+{
+	WriteCmd(CASET); // set column range (x0,x1)
+	WriteWord(x0);
+	WriteWord(x1);
+	WriteCmd(RASET); // set row range (y0,y1)
+	WriteWord(y0);
+	WriteWord(y1);
+}
+void ClearScreen()
+{
+	SetAddrWindow(0,0,XMAX,YMAX); // set window to entire display
+	WriteCmd(RAMWR);
+	for (unsigned int i=40960;i>0;--i) // byte count = 128*160*2
+	{
+		SPDR = 0; // initiate transfer of 0x00
+		while (!(SPSR & 0x80)); // wait for xfer to finish
+	}
+}
+// ---------------------------------------------------------------------------
+// SIMPLE GRAPHICS ROUTINES
+//
+// note: many routines have byte parameters, to save space,
+// but these can easily be changed to int params for larger displays.
+void DrawPixel (byte x, byte y, int color)
+{
+	SetAddrWindow(x,y,x,y);
+	Write565(color,1);
+}
+void HLine (byte x0, byte x1, byte y, int color)
+// draws a horizontal line in given color
+{
+	byte width = x1-x0+1;
+	SetAddrWindow(x0,y,x1,y);
+	Write565(color,width);
+}
+
+
+
+
+// ---------------------------------------------------------------------------
+// TEXT ROUTINES
+//
+// Each ASCII character is 5x7, with one pixel space between characters
+// So, character width = 6 pixels & character height = 8 pixels.
+//
+// In portrait mode:
+// Display width = 128 pixels, so there are 21 chars/row (21x6 = 126).
+// Display height = 160 pixels, so there are 20 rows (20x8 = 160).
+// Total number of characters in portait mode = 21 x 20 = 420.
+//
+// In landscape mode:
+// Display width is 160, so there are 26 chars/row (26x6 = 156).
+// Display height is 128, so there are 16 rows (16x8 = 128).
+// Total number of characters in landscape mode = 26x16 = 416.
+byte curX,curY; // current x & y cursor position
+void GotoXY (byte x,byte y)
+// position cursor on character x,y grid, where 0<x<20, 0<y<19.
+{
+	curX = x;
+	curY = y;
+}
+void GotoLine(byte y)
+// position character cursor to start of line y, where 0<y<19.
+{
+	curX = 0;
+	curY = y;
+}
+void AdvanceCursor()
+// moves character cursor to next position, assuming portrait orientation
+{
+	curX++; // advance x position
+	if (curX>20) // beyond right margin?
+	{
+		curY++; // go to next line
+		curX = 0; // at left margin
+	}
+	if (curY>19) // beyond bottom margin?
+	curY = 0; // start at top again
+}
+
+
+
+
+
+
+
+void PutCh (char ch, byte x, byte y, int color)
+// write ch to display X,Y coordinates using ASCII 5x7 font
+{
+	int pixel;
+	byte row, col, bit, data, mask = 0x01;
+	SetAddrWindow(x,y,x+4,y+6);
+	WriteCmd(RAMWR);
+	for (row=0; row<7;row++)
+	{
+		for (col=0; col<5;col++)
+		{
+			data = pgm_read_byte(&(FONT_CHARS[ch-32][col]));
+			bit = data & mask;
+			if (bit==0) pixel=BLACK;
+			else pixel=color;
+			WriteWord(pixel);
+		}
+		mask <<= 1;
+	}
+}
+void WriteChar(char ch, int color)
+// writes character to display at current cursor position.
+{
+	PutCh(ch,curX*6, curY*8, color);
+	AdvanceCursor();
+}
+void WriteString(char *text, int color)
+// writes string to display at current cursor position.
+{
+	for (;*text;text++) // for all non-nul chars
+	WriteChar(*text,color); // write the char
+}
+void WriteInt(int i)
+// writes integer i at current cursor position
+{
+	char str[8]; // buffer for string result
+	itoa(i,str,10); // convert to string, base 10
+	WriteString(str,WHITE);
+}
+void WriteHex(int i)
+// writes hexadecimal value of integer i at current cursor position
+{
+	char str[8]; // buffer for string result
+	itoa(i,str,16); // convert to base 16 (hex)
+	WriteString(str,WHITE);
+}
+// ---------------------------------------------------------------------------
+// TEST ROUTINES
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+int lrp = 6; // left right pointer
+
+int i=1; //used in INT
+int i2=i;
+int jk=0; // used in PCINT
+
+int intrr(void){
+
+	EICRA |= (1 << ISC01)|(0 << ISC00)|(1<< ISC11)|(0<<ISC10)    ;  // interrupt of INT0 will be occurred in rising edge , see reg description
+	EIMSK |= (1 << INT0)| (1<<INT1)  ;  // enabling int0 and INT1
+	
+	PCICR = 0b00000001;  // enabling pin change interrupt 0,1,2
+	PCMSK0 = 0b000000001; // enabling i/o port of PIN CHANGE INTERRUPT 0 only
+	
+
+	sei();   // turn on interrupts
+}
+
+
+ISR(PCINT0_vect){
+	
+	jk=jk+1;
+	
+	
+	if (jk>1)
+	{
+		GotoXY(lrp,i);
+		WriteString("  ",RED);
+		lrp = lrp + 9;
+		GotoXY(lrp,i);
+		WriteString("**",RED)	;
+		if (lrp>19)
+		{
+			GotoXY(lrp,i);
+			WriteString("  ",RED);
+			lrp=6;
+			GotoXY(lrp,i);
+			WriteString("**",RED);
+			
+		}
+		
+		
+		PORTC ^= (1<<0);
+		jk=0;
+		
+	}
+}
+
+
+
+
+
+ISR(INT0_vect){      // ISR for external interrupt 0
+	if (i==7){
+		i=0;
+		GotoXY(lrp,(7));
+		WriteString("  ",RED);
+	}
+	i=i+1;
+	i2=i;
+	GotoXY(lrp,i);
+	WriteString("**",RED);
+	GotoXY(lrp,(i-1));
+	WriteString("  ",RED);
+	DDRC=0xff;
+	PORTC ^= (1<<3);
+}
+
+
+
+ISR(INT1_vect){
+	if (i==1){
+		i=8;
+		GotoXY(lrp,(1));
+		WriteString("  ",RED);
+	}
+	
+	i=i-1;
+	i2=i;
+	GotoXY(lrp,i);
+	WriteString("**",RED);
+	GotoXY(lrp,(i+1));
+	WriteString("  ",RED);
+	DDRC=0xff;
+	PORTC ^= (1<<3);
+	
+}
+
+
+
+
+
+
+
+int main()
+{
+	
+	
+	intrr();
+	
+	//DDRB = (0<<0);
+	DDRD=0b0;
+	DDRC=0xff;
+	SetupPorts(); // use PortB for LCD interface
+	FlashLED(1); // indicate program start
+	OpenSPI(); // start communication to TFT
+	InitDisplay(); // initialize TFT controller
+	ClearScreen();
+	
+	int j;
+	for(j=1; j<8; j++){
+		GotoXY(2,j); // position text cursor
+		WriteString("  um",YELLOW); // display text inside oval
+		GotoXY(1,j);
+		WriteInt((j*2)-1);
+	}
+	
+	
+	//int j;
+	for(j=1; j<8; j++){
+		GotoXY(11,j); // position text cursor
+		WriteString(" num",YELLOW); // display text inside oval
+		GotoXY(9,j);
+		WriteInt(j*2);
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	CloseSPI(); // close communication with TFT
+	FlashLED(3); // indicate program end
+	
+	//int i=0;
+	while(1){
+		GotoXY(1,11);
+		WriteString("poss-",RED);
+		GotoXY(5,11);
+		WriteInt(i2);
+		GotoXY(8,11);
+		WriteInt(lrp);
+		_delay_ms(400);
+		GotoXY(1,11);
+		WriteString("             ",RED);
+		_delay_ms(100);
+	}
+	
+}
+
