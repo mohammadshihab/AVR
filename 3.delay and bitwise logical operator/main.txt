@@ -1,0 +1,22 @@
+
+#include <avr/io.h>
+#include<util/delay.h>
+
+int main(void)
+{
+	
+	DDRB = 0xff;
+	// PORTB = 0b10000000;
+	//PINB= 0b 1000;
+	/* Replace with your application code */
+	while (1)
+	{
+		PORTB = 0b10000000; //| 0b10000100;
+		_delay_ms(500);
+		PORTB = 0b01000000; // | 0b10010000;
+		_delay_ms(500);
+		
+	}
+	return 0;
+}
+

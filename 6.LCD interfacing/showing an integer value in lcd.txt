@@ -1,0 +1,107 @@
+
+
+// simple text//
+
+
+#include <avr/io.h>
+#include <util/delay.h>
+
+/* regester B is selected for sending data( also command data) and
+  regester D is selected for controlling three pins RS, RW and EN.
+ here RS=0 for sending commnd and RS=1 for sending data  
+ and regester C is selected for ADC ( as its fixed) */ 
+
+
+
+void   LCD_Command ( unsigned char cmnd ){
+	PORTB = cmnd;
+	PORTD = 0b00000100;  /*RS=0 command reg.  ; RW=0 Write operation  ; EN=1*/
+	_delay_us(1);
+	PORTD = 0b00000000;   /*RS=0 command reg.  ; RW=0 Write operation  ; EN=0*/
+	_delay_ms(3); 
+}
+
+
+void lcdChar( unsigned char  character_data ){
+	DDRB = 0xff;
+	DDRC = 0xff;
+	PORTB = character_data;
+	PORTD = 0b00000101; /* RS=1 Data reg.;  RW=0 write operation  and EN=1 */
+	_delay_us(1);
+	PORTD = 0b00000001; /* EN=0 */
+	_delay_ms(50);
+}
+
+
+void lcdInit(void){
+	DDRB = 0xff;
+	DDRD = 0xff;
+	_delay_ms(20);
+	LCD_Command (0x38);		/* Initialization of 16X2 LCD in 8bit mode */
+	LCD_Command (0x0C);		/* Display ON Cursor OFF */
+	LCD_Command (0x06);		/* Auto Increment cursor */
+	LCD_Command (0x01);		/* Clear display */
+	LCD_Command (0x80);		/* Cursor at home position */
+}
+
+
+void lcdString( char *str){
+	int i=0;
+	for(i=0; str[i]!=0; i++){
+		lcdChar(str[i]);
+	}
+}
+
+
+void lcdClear(){
+	LCD_Command(0x01);
+	LCD_Command(0x80);
+}
+
+
+
+
+void LCD_String_xy (char row, char pos, unsigned char  character_data)/* Send string to LCD with xy position */
+{
+	if (row == 0 && pos<16)
+	LCD_Command((pos & 0x0F)|0x80);	/* Command of first row and required position<16 */
+	else if (row == 1 && pos<16)
+	LCD_Command((pos & 0x0F)|0xC0);	/* Command of first row and required position<16 */
+	lcdChar(character_data);		/* Call LCD string function */
+}
+
+
+
+
+
+char arr[11] = "0123456789";
+
+int main(){
+	
+	
+	//DDRD = 0xff;
+	//PORTD = 0xff;
+	
+	
+	
+	lcdInit();
+	
+	LCD_Command (0x01);		/* Clear display */
+	
+	int val = 5453;
+	
+	LCD_String_xy(0,0,arr[val/1000%10]);
+	LCD_String_xy(0,1,arr[val/100%10]);
+	LCD_String_xy(0,2,arr[val/10%10]);
+	LCD_String_xy(0,3,arr[val/1%10]);
+	
+	LCD_Command(0xC0);
+	lcdString("this is 2nd line");
+	return 0;
+}
+
+
+
+
+
+

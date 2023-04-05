@@ -1,0 +1,44 @@
+#include <avr/io.h>
+#include <util/delay.h>
+//#include <avr/power.h>
+//#define LED_DDR   DDRB;
+//#define LED_PORT  PORTB;
+
+//initializing function for ADC//
+
+
+
+//main function//
+int main(void){
+	//initialization in main function//
+	uint8_t ledValue;
+	uint16_t adcValue;
+	uint8_t i;
+	
+	ADMUX =  0b00000000;
+	ADCSRA = 0b10000011;
+	DDRB = 0xff;
+	DDRC = 0x00;
+	
+	
+	//event loop//
+	while(1){
+		
+		while ((ADCSRA & (1<<ADIF))==0){
+		
+		
+		adcValue = ADC;
+		
+		DDRB= ADCH;
+		
+		PORTB = 0;
+		
+		for (i=0; i<= ledValue ; i++)
+		{
+			PORTB |= (1<<i);
+		}
+		_delay_ms(50);
+		}
+	}
+	return(0);
+}

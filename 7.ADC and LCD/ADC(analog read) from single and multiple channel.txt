@@ -1,0 +1,433 @@
+// this code scans ADC1 for an analog signal upon request, using 8Mhz processor clock
+
+
+
+
+//this code  is divided in 2 parts , one LCD setup and two ANALOGRead(ADC)
+// analog read is very simple and controlled by only one function  int ADCsingleREAD(uint8_t adctouse)
+// rest of the functions (out of main function ) are to set up lcd
+
+
+#include <avr/io.h>
+#include <stdint.h>       // needed for uint8_t
+#include <util/delay.h>
+
+
+
+
+
+
+
+
+void   LCD_Command ( unsigned char cmnd ){
+	PORTB = cmnd;
+	PORTD = 0b00000100;  /*RS=0 command reg.  ; RW=0 Write operation  ; EN=1*/
+	_delay_us(1);
+	PORTD = 0b00000000;   /*RS=0 command reg.  ; RW=0 Write operation  ; EN=0*/
+	_delay_ms(3);
+}
+
+
+void lcdChar( unsigned char  character_data ){
+	DDRB = 0xff;
+	DDRC = 0xff;
+	PORTB = character_data;
+	PORTD = 0b00000101; /* RS=1 Data reg.;  RW=0 write operation  and EN=1 */
+	_delay_us(1);
+	PORTD = 0b00000001; /* EN=0 */
+	_delay_ms(50);
+}
+
+
+void lcdInit(void){
+	DDRB = 0xff;
+	DDRD = 0xff;
+	_delay_ms(20);
+	LCD_Command (0x38);		/* Initialization of 16X2 LCD in 8bit mode */
+	LCD_Command (0x0C);		/* Display ON Cursor OFF */
+	LCD_Command (0x06);		/* Auto Increment cursor */
+	LCD_Command (0x01);		/* Clear display */
+	LCD_Command (0x80);		/* Cursor at home position */
+}
+
+
+void lcdString( char *str){
+	int i=0;
+	for(i=0; str[i]!=0; i++){
+		lcdChar(str[i]);
+	}
+}
+
+
+void lcdClear(){
+	LCD_Command(0x01);
+	LCD_Command(0x80);
+}
+
+
+
+
+void LCD_String_xy (char row, char pos, unsigned char  character_data)/* Send string to LCD with xy position */
+{
+	if (row == 0 && pos<16)
+	LCD_Command((pos & 0x0F)|0x80);	/* Command of first row and required position<16 */
+	else if (row == 1 && pos<16)
+	LCD_Command((pos & 0x0F)|0xC0);	/* Command of first row and required position<16 */
+	lcdChar(character_data);		/* Call LCD string function */
+}
+
+
+
+
+
+
+
+
+int ADCsingleREAD(uint8_t adctouse)
+{
+	int ADCval;
+
+	ADMUX = adctouse;         // use #1 ADC
+	ADMUX |= (1 << REFS0);    // use AVcc as the reference
+	ADMUX &= ~(1 << ADLAR);   // clear for 10 bit resolution
+	
+	ADCSRA |= (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);    // 128 prescale for 8Mhz
+	ADCSRA |= (1 << ADEN);    // Enable the ADC
+
+	ADCSRA |= (1 << ADSC);    // Start the ADC conversion
+
+	while(ADCSRA & (1 << ADSC));      // Thanks T, this line waits for the ADC to finish
+
+
+	ADCval = ADCL;
+	ADCval = (ADCH << 8) + ADCval;    // ADCH is read so ADC can be updated again
+                                           // both ADCL and ADCH registers are stored in
+                                           // a simple INT VARIABLE//
+
+	return ADCval;
+}
+
+
+
+
+
+
+
+char arr[11] = "0123456789";
+
+
+
+int main(void)
+{
+	
+	lcdInit();
+	
+	LCD_Command (0x01);
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	int ADCvalue;
+	
+
+	while (1)
+	{
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+
+		
+		
+		ADCvalue = ADCsingleREAD(1);
+		// ADCvalue now contains an 10bit ADC read
+		
+		
+		
+		LCD_String_xy(0,0,arr[ADCvalue/1000%10]);
+		LCD_String_xy(0,1,arr[ADCvalue/100%10]);
+		LCD_String_xy(0,2,arr[ADCvalue/10%10]);
+		LCD_String_xy(0,3,arr[ADCvalue/1%10]);
+		
+		LCD_Command(0xC0);
+		lcdString("this is 2nd line");
+		
+		
+		
+		
+		
+		
+		
+		
+	}
+	
+	return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// this code is quite same bt can be read 2 (multiple) channel in same time
+
+// this code scans ADC1 and ADC2 for an analog signal upon request, using 8Mhz processor clock
+
+#include <avr/io.h>
+#include <stdint.h>       // needed for uint8_t
+#include <util/delay.h>
+
+
+
+
+
+
+
+
+void   LCD_Command ( unsigned char cmnd ){
+	PORTB = cmnd;
+	PORTD = 0b00000100;  /*RS=0 command reg.  ; RW=0 Write operation  ; EN=1*/
+	_delay_us(1);
+	PORTD = 0b00000000;   /*RS=0 command reg.  ; RW=0 Write operation  ; EN=0*/
+	_delay_ms(3);
+}
+
+
+void lcdChar( unsigned char  character_data ){
+	DDRB = 0xff;
+	DDRC = 0xff;
+	PORTB = character_data;
+	PORTD = 0b00000101; /* RS=1 Data reg.;  RW=0 write operation  and EN=1 */
+	_delay_us(1);
+	PORTD = 0b00000001; /* EN=0 */
+	_delay_ms(50);
+}
+
+
+void lcdInit(void){
+	DDRB = 0xff;
+	DDRD = 0xff;
+	_delay_ms(20);
+	LCD_Command (0x38);		/* Initialization of 16X2 LCD in 8bit mode */
+	LCD_Command (0x0C);		/* Display ON Cursor OFF */
+	LCD_Command (0x06);		/* Auto Increment cursor */
+	LCD_Command (0x01);		/* Clear display */
+	LCD_Command (0x80);		/* Cursor at home position */
+}
+
+
+void lcdString( char *str){
+	int i=0;
+	for(i=0; str[i]!=0; i++){
+		lcdChar(str[i]);
+	}
+}
+
+
+void lcdClear(){
+	LCD_Command(0x01);
+	LCD_Command(0x80);
+}
+
+
+
+
+void LCD_String_xy (char row, char pos, unsigned char  character_data)/* Send string to LCD with xy position */
+{
+	if (row == 0 && pos<16)
+	LCD_Command((pos & 0x0F)|0x80);	/* Command of first row and required position<16 */
+	else if (row == 1 && pos<16)
+	LCD_Command((pos & 0x0F)|0xC0);	/* Command of first row and required position<16 */
+	lcdChar(character_data);		/* Call LCD string function */
+}
+
+
+
+
+
+
+
+
+int ADCsingleREAD(uint8_t adctouse)
+{
+	int ADCval;
+
+	ADMUX = adctouse;         // use #1 ADC
+	ADMUX |= (1 << REFS0);    // use AVcc as the reference
+	ADMUX &= ~(1 << ADLAR);   // clear for 10 bit resolution
+	
+	ADCSRA |= (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);    // 128 prescale for 8Mhz
+	ADCSRA |= (1 << ADEN);    // Enable the ADC
+
+	ADCSRA |= (1 << ADSC);    // Start the ADC conversion
+
+	while(ADCSRA & (1 << ADSC));      // Thanks T, this line waits for the ADC to finish
+
+
+	ADCval = ADCL;
+	ADCval = (ADCH << 8) + ADCval;    // ADCH is read so ADC can be updated again
+
+	return ADCval;
+}
+
+
+
+
+
+
+
+char arr[11] = "0123456789";
+
+
+
+int main(void)
+{
+	
+	lcdInit();
+	
+	LCD_Command (0x01);
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	int ADCvalue2;
+	
+	
+	
+	int ADCvalue;
+	
+
+	while (1)
+	{
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+
+		
+		
+		ADCvalue = ADCsingleREAD(1);
+		// ADCvalue now contains an 10bit ADC read
+		
+		
+		
+		LCD_String_xy(0,0,arr[ADCvalue/1000%10]);
+		LCD_String_xy(0,1,arr[ADCvalue/100%10]);
+		LCD_String_xy(0,2,arr[ADCvalue/10%10]);
+		LCD_String_xy(0,3,arr[ADCvalue/1%10]);
+		
+		
+		
+		
+		ADCvalue2 = ADCsingleREAD(2);
+		// ADCvalue now contains an 10bit ADC read
+		
+		
+		
+		LCD_String_xy(0,6,arr[ADCvalue2/1000%10]);
+		LCD_String_xy(0,7,arr[ADCvalue2/100%10]);
+		LCD_String_xy(0,8,arr[ADCvalue2/10%10]);
+		LCD_String_xy(0,9,arr[ADCvalue2/1%10]);
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		LCD_Command(0xC0);
+		lcdString("this is 2nd line");
+		
+		
+		
+		
+		
+		
+		
+		
+	}
+	
+	return 0;
+}

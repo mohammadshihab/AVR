@@ -1,0 +1,20 @@
+#include <avr/io.h>
+
+
+int main(void)
+{
+	DDRB = 0xff;
+	DDRD = 0xff;
+	DDRC = 0x00;
+	ADCSRA = 0x83; // ADC Enable bit (ADEN) set 1, ADLAR =0 and prescaler set as 8//
+	ADMUX =  0b00000000; // using external reference voltage connected in AREF//
+	while (1)
+	{
+		ADCSRA |= (1 << ADSC); // starting conversation //
+		while ((ADCSRA &(1<<ADIF))==0); // ADIF bit set as 1 when ADC conversation is completed and data register are updated //
+		PORTD = ADCL;  // as ADLAR=1 first 8 from lsb wiil be in PORD//
+		PORTB = ADCH; // as ADLAR=1 first 2 msb wiil be in PORB//
+		
+	}
+	return 0;
+}
