@@ -1,0 +1,89 @@
+#include <avr/io.h>
+#include <stdint.h>       // needed for uint8_t
+#include <util/delay.h>
+
+
+int adcread(void){
+	
+	
+	int ADCval;
+
+	//	ADMUX = adctouse;         // use #1 ADC
+	//ADMUX = ADMUX(1 << REFS0);    // use AVcc as the reference
+	//	ADMUX &= ~(1 << ADLAR);   // clear for 10 bit resolution
+	
+	
+	ADMUX = 0b01000000;
+	ADCSRA = 0b11000111;
+	
+	
+	while(ADCSRA & (1 << ADSC));
+	
+	ADCval = ADCL;
+	ADCval = (ADCH << 8) + ADCval;
+	
+	
+	
+	return ADCval;
+}
+
+
+
+
+
+
+
+
+
+
+
+int main(void){
+	
+	DDRD = 0xff;
+	DDRB = 0xff;
+	
+	int adcVall;
+	int i;
+	
+	double ratio;
+	int onTime, offTime, tLength;
+	
+	
+	
+	while(1){
+		tLength= 200;
+		
+		
+		adcVall=adcread();
+		
+		//ratio = adcVall/1024;
+		onTime=(adcVall/5);
+		
+		
+		offTime = 210 - onTime;
+		
+		
+		
+		
+		
+		
+		
+		PORTD = adcVall;
+		PORTB=0xff;
+		for (i=0; i<onTime; i++)
+		{
+			_delay_ms(1);
+		}
+		
+		PORTB=0x00;
+		for (i=0; i<offTime; i++)
+		{
+			_delay_ms(1);
+		}
+		
+	}
+	
+	return 0;
+}
+
+

@@ -1,0 +1,57 @@
+/* this code is capturing number of button pressed in INT0
+and capturing pulse width provided in INT1 */
+
+
+
+
+#include<stdio.h>
+#include<avr/io.h>
+#include<avr/interrupt.h>
+int main(){
+	DDRD &= ~((1 << DDD2)|(1<<DDD3)); // Clear the PD2 pin
+	// PD2 (PCINT0 pin) and PD3 (PCINT1 pin)is now  input
+	
+	
+	PORTD |= (1 << PORTD2)|(1<<PORTD3); // turn On the Pull-up
+	// PD2 is now an input with pull-up enabled as well as PD3
+	
+	
+	EICRA |= (1 << ISC01)|(0 << ISC00)|(0<< ISC11)|(1<<ISC10)    ;  // interrupt of INT0 will be occurred in rising edge , see reg description
+	// interrupt of INT1 will be occurred in any logical change of INT1
+	// INT1 can be used for measuring pulse width and INT0 for capturing
+	// number of button has been pressed
+	
+	
+	EIMSK |= (1 << INT0) | (1<<INT1)  ;  // enabling int0 and INT1
+	
+	
+	DDRB = 0xFF;
+	PORTB = 0x00;
+	
+	DDRC = 0xFF;
+	PORTC = 0x00;
+	
+	
+	sei();   // turn on interrupts
+	while(1);
+}
+
+
+
+
+ISR(INT0_vect){      // ISR for external interrupt 0
+	
+	
+	PORTC += 1;  // counting in binary 0b0 to 0b1111111
+	//PORTC |= 1+ PORTC;   // counting bitwise in decimal 1 to 7
+	
+	//PORTB ^=(1<<3);      // toggling PB3;
+}
+
+
+
+ISR(INT1_vect){
+	PORTB ^= (1<<4);
+}
+
+
