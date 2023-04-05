@@ -1,0 +1,158 @@
+// this code is under construction//
+// here are the codes for uart communication between two atmega 328p +
+showing it in lcd.
+############
+first one for transmitting any data, it might be in both way
+i.recieving from another transmitter side (like vartual transmitter)
+ii. or it may create a custom data to transmit
+
+code:
+#include <avr/io.h>
+#define F_CPU 16000000UL
+
+
+void uartinit(){
+		UBRR0H=0x00;
+		UBRR0L=0x4d; // To set the Buad rate to 9600.. get value through above formula
+		UCSR0B=(1<<RXEN0)|(1<<TXEN0);
+		UCSR0C=(0<<UMSEL00) | (3<<UCSZ00)| (0<<UPM00) | (0<<USBS0) ;
+}
+
+unsigned char data;
+
+char cch='a';
+
+/*
+void USART_TransmitPolling(uint8_t DataByte)
+{
+	while (( UCSR0A & (1<<UDRE0)) == 0) {}; // Do nothing until UDR is ready
+	UDR0 = DataByte;
+}
+*/
+
+
+void uart_transmit (uint8_t dataa)
+{
+	while (( UCSR0A & (1<<UDRE0)) == 0) {}; //do nothing untill UDR is ready
+	// wait for the register to free from data
+	UDR0 = dataa;
+	// load data in the register
+}
+
+
+
+
+int main()
+{
+uartinit();
+	while(1){
+		//uart_receive();
+		uart_transmit('b');
+	}
+	return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+###########
+second one is recieving transmitted data (from first transmitter side)
+then show it in lcd,
+so , this code will be for both, recieving data and display in on a lcd.
+code is given bellow:
+//simple text looping//
+#include <avr/io.h>
+#include <util/delay.h>
+#define F_CPU 16000000UL
+
+/* regester C is selected for sending data( also command data) and
+  regester B is selected for controlling three pins RS, RW and EN.
+ here RS=0 for sending commnd and RS=1 for sending data */ 
+
+void   LCD_Command ( unsigned char cmnd ){
+	PORTB = cmnd;
+	PORTC = 0b00000100;  /*RS=0 command reg.  ; RW=0 Write operation  ; EN=1*/
+	_delay_us(1);
+	PORTC = 0b00000000;   /*RS=0 command reg.  ; RW=0 Write operation  ; EN=0*/
+	_delay_ms(3); 
+}
+void lcdChar( unsigned char  character_data ){
+	DDRB = 0xff;
+	DDRC = 0xff;
+	PORTB = character_data;
+	PORTC = 0b00000101; /* RS=1 Data reg.;  RW=0 write operation  and EN=1 */
+	_delay_us(1);
+	PORTC = 0b00000001; /* EN=0 */
+	_delay_ms(50);
+}
+void lcdInit(void){  // this function is required to initailize the lcd disp
+	DDRB = 0xff;
+	DDRC = 0xff;
+	_delay_ms(20);
+	LCD_Command (0x38);		/* Initialization of 16X2 LCD in 8bit mode */
+	LCD_Command (0x0C);		/* Display ON Cursor OFF */
+	LCD_Command (0x06);		/* Auto Increment cursor */
+	LCD_Command (0x01);		/* Clear display */
+	LCD_Command (0x80);		/* Cursor at home position */
+}
+
+
+void lcdString( char str){
+	/*int i=0;
+	for(i=0; str[i]!=0; i++){
+		lcdChar(str[i]);
+	}*/
+	lcdChar(str);
+}
+void lcdClear(){
+	LCD_Command(0x01);
+	LCD_Command(0x80);
+}
+
+
+
+
+void uartinit(){
+	UBRR0H= 0x00;
+	UBRR0L= 0x4d; // To set the Buad rate to 9600.. get value through above formula
+	/*UCSR0B= 0b01001000;
+	UCSR0C= 0b00000100;*/
+	UCSR0B=(1<<RXEN0)|(1<<TXEN0);
+	UCSR0C=(0<<UMSEL00) | (3<<UCSZ00)| (0<<UPM00) | (0<<USBS0) ;
+}
+
+char uartrecieve(){
+		//while((UCSR0A &&(1<< RXC0)) == 0);
+		while((UCSR0A &(1<< RXC0)) == 0);
+		// wait untill 8-bit of a character receive
+		return UDR0;
+}
+
+unsigned char rcvdata = uartrecieve();
+void inisdeloopFunc(void){
+	lcdString(rcvdata);
+	LCD_Command(0xC0);
+	lcdString(rcvdata);
+}
+
+
+
+int main(){
+	int j;
+	lcdInit();
+	uartinit();
+	while (1)
+	{
+		inisdeloopFunc();
+		LCD_Command (0x01);		/* Clear display */
+	}
+	return 0;
+}
