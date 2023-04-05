@@ -1,0 +1,307 @@
+
+#include <avr/io.h>
+#include <stdint.h>       // needed for uint8_t
+#include <util/delay.h>
+#include <stdio.h>
+#include <avr/interrupt.h>
+
+
+
+
+
+int inCap=0;
+int pWidth=0;
+
+char arr[11] = "0123456789";
+
+void   LCD_Command ( unsigned char cmnd ){
+	PORTB = cmnd;
+	//PORTD = 0b00000100;  /*RS=0 command reg.  ; RW=0 Write operation  ; EN=1*/
+	PORTD = (1<<6)|(0<<5)|(0<<4)|(1 << 2)|(1<<3);
+	
+	
+	_delay_us(1);
+	//PORTD = 0b00000000;   /*RS=0 command reg.  ; RW=0 Write operation  ; EN=0*/
+	PORTD = (0<<6)|(0<<5)|(0<<4)|(1 << 2)|(1<<3);
+	
+	_delay_ms(3);
+}
+
+
+void lcdChar( unsigned char  character_data ){
+	DDRB = 0xff;
+	DDRC = 0xff;
+	PORTB = character_data;
+	//PORTD = 0b00000101; /* RS=1 Data reg.;  RW=0 write operation  and EN=1 */
+	PORTD = (1<<6)|(0<<5)|(1<<4)|(1 << 2)|(1<<3);
+	
+	
+	_delay_us(1);
+	//PORTD = 0b00000001; /* EN=0 */
+	PORTD = (0<<6)|(0<<5)|(1<<4)|(1 << 2)|(1<<3);
+	
+	
+	_delay_ms(50);
+}
+
+
+void lcdInit(void){
+	DDRB = 0xff;
+	DDRD = 0xff;
+	_delay_ms(20);
+	LCD_Command (0x38);		/* Initialization of 16X2 LCD in 8bit mode */
+	LCD_Command (0x0C);		/* Display ON Cursor OFF */
+	LCD_Command (0x06);		/* Auto Increment cursor */
+	LCD_Command (0x01);		/* Clear display */
+	LCD_Command (0x80);		/* Cursor at home position */
+}
+
+
+void lcdString( char *str){
+	int i=0;
+	for(i=0; str[i]!=0; i++){
+		lcdChar(str[i]);
+	}
+}
+
+
+void lcdClear(){
+	LCD_Command(0x01);
+	LCD_Command(0x80);
+}
+
+
+
+//for writing an single char in a specific point
+void LCD_String_xy (char row, char pos, unsigned char  character_data)/* Send string to LCD with xy position */
+{
+	if (row == 0 && pos<20)
+	LCD_Command((pos & 0x0F)|0x80);	/* Command of first row and required position<16 */
+	else if (row == 1 && pos<20)
+	LCD_Command((pos & 0x0F)|0xC0);	/* Command of first row and required position<16 */
+	lcdChar(character_data);		/* Call LCD string function */
+}
+
+
+
+
+//  to send char line in xy position
+void LCD_stringWrite_xyz (char row, char pos,  char  *character_dataa)/* Send string to LCD with xy position */
+{
+	if (row == 0 && pos<20)
+	LCD_Command((pos & 0x0F)|0x80);	/* Command of first row and required position<16 */
+	else if (row == 1 && pos<20)
+	LCD_Command((pos & 0x0F)|0xC0);	/* Command of first row and required position<16 */
+	//lcdChar(character_dataa);		/* Call LCD string function */
+	
+	
+	
+	int ii=0;
+	for(ii=0; character_dataa[ii]!=0; ii++){
+		lcdChar(character_dataa[ii]);
+	}
+}
+
+
+
+
+
+
+
+
+int LCD_varWrite_xyz(int row, int coll, int variable){
+	
+	
+	LCD_String_xy(row, coll, arr[variable/1000%10]);
+	LCD_String_xy(row,(coll+1), arr[variable/100%10]);
+	LCD_String_xy(row,(coll+2),arr[variable/10%10]);
+	LCD_String_xy(row, (coll+3), arr[variable/1%10]);
+	
+	
+	
+	
+}
+
+
+
+
+
+
+
+int ADCsingleREAD(uint8_t adctouse)
+{
+	int ADCval;
+
+	ADMUX = adctouse;         // use #1 ADC
+	ADMUX |= (1 << REFS0);    // use AVcc as the reference
+	ADMUX &= ~(1 << ADLAR);   // clear for 10 bit resolution
+	
+	ADCSRA |= (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);    // 128 prescale for 8Mhz
+	ADCSRA |= (1 << ADEN);    // Enable the ADC
+
+	ADCSRA |= (1 << ADSC);    // Start the ADC conversion
+
+	while(ADCSRA & (1 << ADSC));      // Thanks T, this line waits for the ADC to finish
+
+
+	ADCval = ADCL;
+	ADCval = (ADCH << 8) + ADCval;    // ADCH is read so ADC can be updated again
+	// both ADCL and ADCH registers are stored in
+	// a simple INT VARIABLE//
+
+	return ADCval;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+int intrr(void){
+
+
+	
+	
+	EICRA |= (1 << ISC01)|(0 << ISC00) ;  // interrupt of INT0 will be occurred in rising edge , see reg description
+	
+	
+	EIMSK |= (1 << INT0) ;  // enabling int0 and INT1
+	
+	
+	
+	sei();   // turn on interrupts
+}
+
+
+
+
+ISR(INT0_vect){      // ISR for external interrupt 0
+	
+	
+	
+	
+	
+	inCap += 1;
+	
+}
+
+
+
+
+
+
+
+
+
+int acs712(int pinNo){
+	int Ivall,Ival;
+	Ivall= (ADCsingleREAD(pinNo)-512);
+	
+	Ival = Ivall*3000/38;
+	
+	
+	return Ival;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+int main(void)
+{
+	
+	
+	
+	DDRD = 0b00001111;
+	
+	
+	PORTD |= (1 << 2)|(1<<3);
+	
+	
+	
+
+	
+	
+	
+	
+	
+	intrr();
+	
+	lcdInit();
+	
+	LCD_Command (0x01);
+	
+	
+	
+	
+	int ADCvalue;
+	
+	
+	
+	int Ival1;
+	
+	Ival1 = acs712(2);
+	
+	
+	
+
+	while (1)
+	{
+		
+		
+		
+		ADCvalue = ADCsingleREAD(1);
+		// ADCvalue now contains an 10bit ADC read
+		
+		
+		
+		LCD_stringWrite_xyz(0,0,"aR:");
+		
+		LCD_varWrite_xyz(0,3,ADCvalue);
+		
+		LCD_stringWrite_xyz(0,9,"PB:");
+		
+		LCD_varWrite_xyz(0,12,inCap);
+		
+		
+		LCD_stringWrite_xyz(1,0,"IC=");
+		
+		
+		LCD_varWrite_xyz(1,3,Ival1);
+		
+		
+		
+		
+		//LCD_stringWrite_xyz(2,0,"shihab");
+		
+		
+		
+		//LCD_stringWrite_xyz(3,0,"           is it okay!");
+		
+		
+	}
+	
+	return 0;
+}
+
+
+
